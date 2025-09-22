@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Face Recognition AI</title>
+
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css"
+    />
+
+    <!-- Custom Stylesheet -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <header>
+      <h1 class="main-title">Face Recognition</h1>
+      <p class="subtitle">
+        Upload an image to detect and analyze faces with our powerful AI.
+      </p>
+    </header>
+
+    <main>
+      <!-- STATE 1: UPLOADER (Hiển thị mặc định) -->
+      <section class="uploader" id="dropzone">
+        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png" hidden />
+        <div class="placeholder" id="placeholder">
+          <div class="image-icon-wrapper">
+            <div class="icon-bg"><i class="fa-regular fa-image"></i></div>
+          </div>
+          <p class="upload-text"><strong>Drop your image here</strong></p>
+          <p class="file-types">Supports: PNG, JPG, JPEG</p>
+          <button class="btn" id="selectBtn">
+            <i class="fa-solid fa-folder-open"></i>Choose a file
+          </button>
+        </div>
+      </section>
+
+      <!-- STATE 2: PROCESSING (Ẩn mặc định) -->
+      <section class="processing-state hidden" id="processingState">
+        <div class="spinner"></div>
+        <p>Analyzing faces...</p>
+      </section>
+
+      <!-- STATE 3: RESULTS (Ẩn mặc định) -->
+      <section class="results-state hidden" id="resultsState">
+        <div class="results-container">
+          <div class="image-wrapper">
+            <img id="resultImage" src="#" alt="Result" />
+            <div class="bounding-box-container" id="boxContainer"></div>
+          </div>
+          <div class="results-summary">
+            <h2 id="resultsTitle">Detection Results</h2>
+            <p id="faceCount"></p>
+            <button class="btn" id="resetBtn">
+              <i class="fa-solid fa-rotate-left"></i>Try another image
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>&copy; 2024 - AI Face Recognition. All Rights Reserved.</p>
+    </footer>
+
+    <!-- Custom Script -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  </body>
+</html>
