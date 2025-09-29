@@ -1,82 +1,128 @@
-import os
-import cv2
-import numpy as np
-from keras.utils import to_categorical
-from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras.layers import Dense, Conv2D, MaxPooling2D, Flatten, Dropout, Rescaling
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.utils import image_dataset_from_directory
+import matplotlib.pyplot as plt
 
-# --- 1. CẤU HÌNH ---
-IMG_WIDTH = 128
-IMG_HEIGHT = 128
-DATA_DIR = '.'
-CLASS_NAMES = ['hoan', 'long', 'nghia']
-NUM_CLASSES = len(CLASS_NAMES)
+
+# --- 1. CÁC THAM SỐ CẤU HÌNH ---
+
+data_dir = '/content/drive/MyDrive/UnnameFolder/AugmentedData'
+
+img_height = 64
+img_width = 64
+
+batch_size = 128
+
+epochs = 10
+
 
 # --- 2. TẢI VÀ CHUẨN BỊ DỮ LIỆU ---
-def load_data(data_dir, class_names):
-    images = []
-    labels = []
-    for i, class_name in enumerate(class_names):
-        path = os.path.join(data_dir, class_name, 'data_mono')
-        if not os.path.isdir(path):
-            print(f"Cảnh báo: Thư mục không tồn tại, bỏ qua: {path}")
-            continue
 
-        print(f"Đang đọc ảnh từ thư mục: {path}")
-        for filename in os.listdir(path):
-            img_path = os.path.join(path, filename)
-            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-            if img is not None:
-                img = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
-                images.append(img)
-                labels.append(i)
-    
-    images = np.array(images)
-    images = np.expand_dims(images, axis=-1)
-    labels = np.array(labels)
-    return images, labels
+print("Đang tải tập dữ liệu huấn luyện...")
+train_ds = image_dataset_from_directory(data_dir,
+                                        validation_split=0.2,
+                                        subset="training",
+                                        seed=42,
+                                        image_size=(img_height, img_width),
+                                        batch_size=batch_size)
 
-# Tải tất cả dữ liệu
-images, labels = load_data(DATA_DIR, CLASS_NAMES)
+print("\nĐang tải tập dữ liệu kiểm định...")
+val_ds = image_dataset_from_directory(data_dir,
+                                      validation_split=0.2,
+                                      subset="validation",
+                                      seed=42,
+                                      image_size=(img_height, img_width),
+                                      batch_size=batch_size)
 
-if len(images) == 0:
-    print("Lỗi: Không tìm thấy ảnh nào.")
-    exit()
+# Lấy ra tên của các lớp (classes) từ tên thư mục
+class_names = train_ds.class_names
+num_classes = len(class_names)
+print(f"\nĐã tìm thấy các lớp (khuôn mặt): {class_names}")
+print(f"Tổng số lớp: {num_classes}")
 
-# Chuẩn hóa pixel và one-hot encoding
-images = images.astype('float32') / 255.0
-labels_cat = to_categorical(labels, NUM_CLASSES)
 
-# --- 3. XÂY DỰNG MÔ HÌNH CNN ĐƠN GIẢN ---
-model = Sequential()
-model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_WIDTH, IMG_HEIGHT, 1)))
-model.add(MaxPooling2D((2, 2)))
-model.add(Conv2D(64, (3, 3), activation='relu'))
-model.add(MaxPooling2D((2, 2)))
-model.add(Flatten())
-model.add(Dense(128, activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(NUM_CLASSES, activation='softmax'))
+# --- 3. TỐI ƯU HÓA HIỆU SUẤT DỮ LIỆU ---
+# Sử dụng cache và prefetch để tăng tốc độ đọc dữ liệu trong quá trình huấn luyện
+AUTOTUNE = tf.data.AUTOTUNE
+train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
+val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
+
+# --- 4. XÂY DỰNG KIẾN TRÚC MÔ HÌNH CNN ---
+
+model = Sequential([
+    Rescaling(1./255, input_shape=(img_height, img_width, 3)),
+
+    Conv2D(32, (3, 3), padding='same', activation='relu'),
+    Conv2D(32, (3, 3), padding='same', activation='relu'),
+    MaxPooling2D(),
+
+    Conv2D(64, (3, 3), padding='same', activation='relu'),
+    Conv2D(64, (3, 3), padding='same', activation='relu'),
+    MaxPooling2D(),
+
+    Conv2D(128, (3, 3), padding='same', activation='relu'),
+    Conv2D(128, (3, 3), padding='same', activation='relu'),
+    MaxPooling2D(),
+
+    Dropout(0.5),
+
+    Flatten(),
+    Dense(512, activation='relu'),
+    Dropout(0.3),
+    Dense(128, activation='relu'),
+    Dropout(0.3),
+    Dense(64, activation='relu'),
+    Dropout(0.3),
+
+    Dense(num_classes, activation='softmax')
+])
+
+
+# --- 5. BIÊN DỊCH MÔ HÌNH (COMPILE) ---
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+# In ra cấu trúc của mô hình
+print("\nCấu trúc của mô hình CNN:")
 model.summary()
 
-# --- 4. HUẤN LUYỆN MÔ HÌNH ---
-model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
-print("\nBắt đầu huấn luyện...")
-# Sử dụng validation_split để Keras tự động tách 20% dữ liệu ra để kiểm thử
-history = model.fit(
-    images, 
-    labels_cat, 
-    epochs=20,
-    batch_size=32,
-    validation_split=0.2
-)
+# --- 6. HUẤN LUYỆN MÔ HÌNH ---
+print("\nBắt đầu quá trình huấn luyện...")
+history = model.fit(train_ds,
+                    validation_data=val_ds,
+                    epochs=epochs,
+                    verbose=2)
+print("Hoàn tất huấn luyện!")
 
-# --- 5. ĐÁNH GIÁ VÀ LƯU MÔ HÌNH ---
-print("\nHoàn tất huấn luyện.")
-val_acc = history.history['val_accuracy'][-1]
-print(f'Độ chính xác trên tập kiểm tra (validation): {val_acc:.4f}')
 
-model.save('face_model.h5')
-print("Đã lưu mô hình vào file 'face_model.h5'")
+# --- 7. LƯU MÔ HÌNH ĐÃ HUẤN LUYỆN ---
+model.save('face_recognition_model.h5')
+print("\nĐã lưu mô hình đã huấn luyện vào file 'face_recognition_model.h5'")
+
+
+# --- 8. ĐÁNH GIÁ VÀ VẼ BIỂU ĐỒ KẾT QUẢ ---
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+
+epochs_range = range(epochs)
+
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+plt.plot(epochs_range, acc, label='Training Accuracy')
+plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+plt.legend(loc='lower right')
+plt.title('Training and Validation Accuracy')
+
+plt.subplot(1, 2, 2)
+plt.plot(epochs_range, loss, label='Training Loss')
+plt.plot(epochs_range, val_loss, label='Validation Loss')
+plt.legend(loc='upper right')
+plt.title('Training and Validation Loss')
+plt.show()
