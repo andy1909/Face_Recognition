@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 # --- 1. CÁC THAM SỐ CẤU HÌNH ---
 
-data_dir = '/content/drive/MyDrive/UnnameFolder/AugmentedData'
+data_dir = 'AugmentedData'
 
 img_height = 64
 img_width = 64
